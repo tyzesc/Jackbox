@@ -1,0 +1,31 @@
+{
+  "name": "jackbox",
+  "version": "1.0.0",
+  "description": "Wrapper of LCU API",
+  "main": "main.js",
+  "dependencies": {
+    "node-fetch": "^2.6.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tyzesc/Jackbox.git"
+  },
+  "keywords": [
+    "Jackbox",
+    "LCU",
+    "LOL",
+    "League",
+    "of",
+    "Legends"
+  ],
+  "author": "tyze",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tyzesc/Jackbox/issues"
+  },
+  "homepage": "https://github.com/tyzesc/Jackbox#readme"
+}
