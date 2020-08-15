@@ -7,6 +7,9 @@ const agent = new https.Agent({ rejectUnauthorized: false })
 
 const lockfilePath = 'C:\\LOL\\32775\\LeagueClient\\lockfile'
 
+const periodOfPollingReadLockfile = 1000
+const periodOfPollingChatQueue = 200
+
 const GAMEFLOW = {
     None: "None",
     Lobby: "Lobby",
@@ -66,9 +69,42 @@ class LCU extends events.EventEmitter {
     constructor() {
         super()
 
+        this.pid = ""
+        this.key = ""
+        this.port = ""
+        this.process = ""
+        this.protocol = ""
         this.penddingMsg = []
 
-        let interval = setInterval(() => {
+        this.pollingReadLockfile()
+        this.pollingChatQueue()
+    }
+
+    isConnected() {
+        return (this.pid !== "" && this.key !== "" && this.port !== "" &&
+            this.process !== "" && this.protocol !== "");
+    }
+
+    pollingChatQueue() {
+        setInterval(() => {
+            if (!this.isConnected()) return
+            if (this.penddingMsg.length === 0 || this.key === undefined)
+                return
+
+            let m = this.penddingMsg.shift()
+            this.getConversation(m.chattype, m.chatname)
+                .then(msg => {
+                    if (msg === undefined)
+                        return this.penddingMsg.unshift(m)
+                    this.postConversation(msg, m.text, m.msgtype)
+                })
+        }, periodOfPollingChatQueue)
+    }
+
+    pollingReadLockfile() {
+        setInterval(() => {
+            if (this.isConnected())
+                return
             if (fs.existsSync(lockfilePath)) {
                 fs.readFile(lockfilePath, (err, data) => {
                     let content = data.toString('utf-8')
@@ -81,26 +117,10 @@ class LCU extends events.EventEmitter {
                     this.protocol = arr[4]
 
                     this.emit('connected')
-                    this.startListener()
-
-                    clearInterval(interval)
+                    this.startGameflowEmitter()
                 })
             }
-        }, 1000)
-
-        // chat loop
-        setInterval(() => {
-            if (this.penddingMsg.length === 0 || this.key === undefined)
-                return
-
-            let m = this.penddingMsg.shift()
-            this.getConversation(m.chattype, m.chatname)
-                .then(msg => {
-                    if (msg === undefined)
-                        return this.penddingMsg.unshift(m)
-                    this.postConversation(msg, m.text, m.msgtype)
-                })
-        }, 200)
+        }, periodOfPollingReadLockfile)
     }
 
     async call(method, url, body, isjson = true) {
@@ -124,13 +144,20 @@ class LCU extends events.EventEmitter {
         return await fetch(uri, options).then(res => res.json())
     }
 
-    async startListener() {
+    async startGameflowEmitter() {
         let oldStatus = "NONE"
-        setInterval(async () => {
-            let newStatus = await this.call('get', 'lol-gameflow/v1/gameflow-phase')
-            if (oldStatus !== newStatus)
-                this.emit(newStatus)
-            oldStatus = newStatus
+        let interval = setInterval(async () => {
+            try {
+                let newStatus = await this.call('get', 'lol-gameflow/v1/gameflow-phase')
+                if (oldStatus !== newStatus)
+                    this.emit(newStatus)
+                oldStatus = newStatus
+            } catch (e) {
+                if (this.isConnected())
+                    this.emit('disconnect')
+                this.key = ""
+                clearInterval(interval)
+            }
         }, 1000)
     }
 
